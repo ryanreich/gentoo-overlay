@@ -1,0 +1,1267 @@
+diff --git a/cngpijmon/src/bjcupsmon_common.h b/cngpijmon/src/bjcupsmon_common.h
+index a48cb0b..ab6ab16 100755
+--- a/cngpijmon/src/bjcupsmon_common.h
++++ b/cngpijmon/src/bjcupsmon_common.h
+@@ -606,3 +606,5 @@ typedef struct {
+ 	ENUM_ErrorLevelID	errorLevel;	// Error level
+ 	ENUM_OtherMessageID	messageID;	// Message ID
+ } ST_ErrorCodeTbl;
++
++#define MODELID_LEN 5
+diff --git a/cngpijmon/src/bjcupsmon_cups.c b/cngpijmon/src/bjcupsmon_cups.c
+index 8e7f950..ed016a0 100755
+--- a/cngpijmon/src/bjcupsmon_cups.c
++++ b/cngpijmon/src/bjcupsmon_cups.c
+@@ -20,6 +20,7 @@
+ /*** Includes ***/
+ #include <cups/cups.h>
+ #include <cups/language.h>
++#include <cups/ppd.h>
+ #include <sys/types.h>
+ #include <unistd.h>
+ #include <pwd.h>
+@@ -115,7 +116,7 @@ PUBLIC gint getProductName(gchar *pDestName, gchar *pProductName, gchar *pModelI
+ 			if (strcmp(pPPD->manufacturer, STR_MANUFACTURER_NAME) == 0) {
+ 				strncpy(pProductName, pPPD->modelname, strlen(pPPD->modelname));	// use modelname from 22th Jan.'03
+ 				/* Ver.3.20 for modelID to cnijnpr */
+-				snprintf(pModelIDstr, sizeof(pModelIDstr), "%d", pPPD->model_number);
++				snprintf(pModelIDstr, MODELID_LEN, "%d", pPPD->model_number);
+ 				retVal = ID_ERR_NO_ERROR;
+ 			}
+ 			ppdClose(pPPD);
+@@ -213,9 +214,9 @@ PRIVATE gint checkPrinterState(gchar *pDestName, gchar *pURI, gchar *pServerName
+ 	}
+ 	else {
+ 		pRequest = ippNew();
+-		
+-		pRequest->request.op.operation_id = IPP_GET_PRINTER_ATTRIBUTES;
+-		pRequest->request.op.request_id   = 1;
++
++                (void) ippSetOperation(pRequest, IPP_GET_PRINTER_ATTRIBUTES);
++                (void) ippSetRequestId(pRequest, 1);
+ 		
+ 		pLanguage = bjcupsLangDefault();			// cupsLangDefault() -> bjcupsLangDefault() for cups-1.1.19 
+ 				
+@@ -224,12 +225,12 @@ PRIVATE gint checkPrinterState(gchar *pDestName, gchar *pURI, gchar *pServerName
+ 		ippAddString(pRequest, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, pURI);
+ 
+ 		if ((pResponse = cupsDoRequest(pHTTP, pRequest, "/")) != NULL) {
+-			if (pResponse->request.status.status_code > IPP_OK_CONFLICT) {
++                        if (ippGetStatusCode(pResponse) > IPP_OK_CONFLICT) {
+ 				retVal = ID_ERR_CUPS_API_FAILED;
+ 			}
+ 			else {
+ 				if ((pAttribute = ippFindAttribute(pResponse, "printer-state", IPP_TAG_ENUM)) != NULL) {
+-					printerState = (ipp_state_t)pAttribute->values[0].integer;
++                                  printerState = ippGetInteger(pAttribute,0);
+ 				}
+ 			}
+ 			
+@@ -286,9 +287,9 @@ PUBLIC gint getPrinterStatus(gchar *pDestName, gchar *pStatus, gint bufSize)
+ 		}
+ 		else {
+ 			pRequest = ippNew();
+-			
+-			pRequest->request.op.operation_id = IPP_GET_PRINTER_ATTRIBUTES;
+-			pRequest->request.op.request_id   = 1;
++
++                        (void) ippSetOperation(pRequest, IPP_GET_PRINTER_ATTRIBUTES);
++                        (void) ippSetRequestId(pRequest, 1);
+ 			
+ 			pLanguage = bjcupsLangDefault();		// cupsLangDefault() -> bjcupsLangDefault() for cups-1.1.19
+ 			
+@@ -297,7 +298,7 @@ PUBLIC gint getPrinterStatus(gchar *pDestName, gchar *pStatus, gint bufSize)
+ 			ippAddString(pRequest, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, printerURI);
+ 			
+ 			if ((pResponse = cupsDoRequest(pHTTP, pRequest, "/")) != NULL) {
+-				if (pResponse->request.status.status_code > IPP_OK_CONFLICT) {
++                                if (ippGetStatusCode(pResponse) > IPP_OK_CONFLICT) {
+ 					retVal = ID_ERR_CUPS_API_FAILED;
+ 				}
+ 				else {
+@@ -309,7 +310,7 @@ PUBLIC gint getPrinterStatus(gchar *pDestName, gchar *pStatus, gint bufSize)
+ 					//}
+ 					pAttribute = ippFindAttribute(pResponse, "printer-state-message", IPP_TAG_TEXT);
+ 					if (pAttribute != NULL) {
+-						strncpy(pStatus, pAttribute->values[0].string.text, bufSize);
++                                          strncpy(pStatus, ippGetString(pAttribute,0,NULL), bufSize);
+ 					}
+ 				}
+ 				ippDelete(pResponse);
+@@ -367,9 +368,9 @@ PUBLIC gint removeJob(gchar *pDestName)
+ 			}
+ 			else {
+ 				pRequest = ippNew();
+-				
+-				pRequest->request.op.operation_id = IPP_CANCEL_JOB;
+-				pRequest->request.op.request_id   = 1;
++
++                                (void) ippSetOperation(pRequest, IPP_CANCEL_JOB);
++                                (void) ippSetRequestId(pRequest, 1);
+ 				
+ 				pLanguage = bjcupsLangDefault();		// cupsLangDefault() -> bjcupsLangDefault() for cups-1.1.19
+ 				
+@@ -380,7 +381,7 @@ PUBLIC gint removeJob(gchar *pDestName)
+ 				ippAddString(pRequest, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsUser());
+ 				
+ 				if ((pResponse = cupsDoRequest(pHTTP, pRequest, "/jobs/")) != NULL) {
+-					if (pResponse->request.status.status_code > IPP_OK_CONFLICT) {
++                                        if (ippGetStatusCode(pResponse) > IPP_OK_CONFLICT) {
+ 						retVal = ID_ERR_CUPS_API_FAILED;
+ 					}
+ 					ippDelete(pResponse);
+@@ -419,7 +420,7 @@ PRIVATE gint getJobID(gchar *pDestName, gchar *pURI, gchar *pServerName, gint *p
+ 	cups_lang_t		*pLanguage;								// Pointer to language.
+ 	ipp_jstate_t	jobState = 0;							// Job state.
+ 	gint			jobID = 0;								// Job ID.
+-	gchar			*pJobUserName = NULL;					// User name of print job.
++	const gchar			*pJobUserName = NULL;					// User name of print job.
+ 	uid_t			userID;									// User ID.
+ 	struct passwd	*pPasswd;								// Pointer to password structure.
+ 	gint			retVal = ID_ERR_PRINT_JOB_NOT_EXIST;	// Return value.
+@@ -443,8 +444,8 @@ PRIVATE gint getJobID(gchar *pDestName, gchar *pURI, gchar *pServerName, gint *p
+ 	else {
+ 		pRequest = ippNew();
+ 		
+-		pRequest->request.op.operation_id = IPP_GET_JOBS;
+-		pRequest->request.op.request_id   = 1;
++                (void) ippSetOperation(pRequest, IPP_GET_JOBS);
++                (void) ippSetRequestId(pRequest, 1);
+ 		
+ 		pLanguage = bjcupsLangDefault();	// cupsLangDefault() -> bjcupsLangDefault() for cups-1.1.19
+ 		
+@@ -455,49 +456,49 @@ PRIVATE gint getJobID(gchar *pDestName, gchar *pURI, gchar *pServerName, gint *p
+ 		ippAddStrings(pRequest, IPP_TAG_OPERATION, IPP_TAG_KEYWORD, "requested-attributes",(int)(sizeof(jobattrs) / sizeof(jobattrs[0])), NULL, jobattrs);
+ 		
+ 		if ((pResponse = cupsDoRequest(pHTTP, pRequest, "/")) != NULL) {
+-			if (pResponse->request.status.status_code > IPP_OK_CONFLICT) {
++                        if (ippGetStatusCode(pResponse) > IPP_OK_CONFLICT) {
+ 				retVal = ID_ERR_CUPS_API_FAILED;
+ 			}
+ 			else {
+-				pAttribute = pResponse->attrs;
+-
+-				while (pAttribute != NULL) {
+-					while (pAttribute != NULL && pAttribute->group_tag != IPP_TAG_JOB) {
+-						pAttribute = pAttribute->next;
+-					}
+-					if (pAttribute == NULL) {
+-						break;
+-					}
+-					
+-					while (pAttribute != NULL && pAttribute->group_tag == IPP_TAG_JOB) {
+-						if (strcmp(pAttribute->name, "job-id") == 0 && pAttribute->value_tag == IPP_TAG_INTEGER) {
+-							jobID = pAttribute->values[0].integer;
+-						}
+-						if (strcmp(pAttribute->name, "job-state") == 0 && pAttribute->value_tag == IPP_TAG_ENUM) {
+-							jobState = (ipp_jstate_t)pAttribute->values[0].integer;
+-						}
+-						if (strcmp(pAttribute->name, "job-originating-user-name") == 0 && pAttribute->value_tag == IPP_TAG_NAME) {
+-							pJobUserName = pAttribute->values[0].string.text;
+-						}
+-						pAttribute = pAttribute->next;
+-					}
+-					if (jobState == IPP_JOB_PROCESSING) {
+-						if (pJobUserName != NULL) {
+-							if (strcmp(pPasswd->pw_name, pJobUserName) == 0) {
+-								retVal = ID_ERR_NO_ERROR;
+-							}
+-							//v.2.00.01.010 for CUPS 1.2 test Print is "guest", but CUPS 1.1 is ""
+-							else if( (pJobUserName[0] == '\0') || (strcmp(pJobUserName, "guest") == 0) ){
+-							//else if (pJobUserName[0] == '\0') {
+-								retVal = ID_ERR_NO_ERROR;
+-							}
+-						}
+-						break;
+-					}
++                          pAttribute = ippFirstAttribute(pResponse);
++                          for (;pAttribute != NULL; pAttribute = ippNextAttribute(pResponse)) {
++                            if (ippGetGroupTag(pAttribute) != IPP_TAG_JOB) {
++                              continue;
++                            }
++                                  
++                            switch(ippGetValueTag(pAttribute)) {
++                            case IPP_TAG_INTEGER:
++                              if (strcmp(ippGetName(pAttribute), "job-id") == 0) {
++                                jobID = ippGetInteger(pAttribute, 0);
++                              }
++                              break;
++                            case IPP_TAG_ENUM:
++                              if (strcmp(ippGetName(pAttribute), "job-state") == 0) {
++                                jobState = (ipp_jstate_t) ippGetInteger(pAttribute, 0);
++                              }
++                              break;
++                            case IPP_TAG_NAME:
++                              if (strcmp(ippGetName(pAttribute), "job-originating-user-name") == 0) {
++                                pJobUserName = ippGetString(pAttribute, 0, NULL);
++                              }
++                              break;
++                            default:
++                              break;
++                            }
++                          }
+ 
+-					if (pAttribute != NULL)
+-						pAttribute = pAttribute->next;
+-				}
++                          if (jobState == IPP_JOB_PROCESSING) {
++                            if (pJobUserName != NULL) {
++                              if (strcmp(pPasswd->pw_name, pJobUserName) == 0) {
++                                retVal = ID_ERR_NO_ERROR;
++                              }
++                              //v.2.00.01.010 for CUPS 1.2 test Print is "guest", but CUPS 1.1 is ""
++                              else if( (pJobUserName[0] == '\0') || (strcmp(pJobUserName, "guest") == 0) ){
++                                //else if (pJobUserName[0] == '\0') {
++                                retVal = ID_ERR_NO_ERROR;
++                              }
++                            }
++                          }
+ 			}
+ 			
+ 			ippDelete(pResponse);
+@@ -536,8 +537,8 @@ PRIVATE gint getPrinterURI(gchar *pDestName, gchar *pURI, gchar *pServerName, gi
+ 					*pResponse;					// Pointer to CUPS IPP response.
+ 	ipp_attribute_t	*pAttribute;				// Pointer to CUPS attributes.
+ 	cups_lang_t		*pLanguage;					// Pointer to language.
+-	gchar			*pPrinter = NULL;			// Pointer to printer name.
+-	gchar			*pUri = NULL;				// Pointer to printer uri.
++	const gchar			*pPrinter = NULL;			// Pointer to printer name.
++	const gchar			*pUri = NULL;				// Pointer to printer uri.
+ 	gchar			*pTemp = NULL;				// Temporary pointer.
+ 	gint			i;							// Counter.
+ 	gint			retVal = ID_ERR_NO_ERROR;	// Return value.
+@@ -554,8 +555,8 @@ PRIVATE gint getPrinterURI(gchar *pDestName, gchar *pURI, gchar *pServerName, gi
+ 	else {
+ 		pRequest = ippNew();
+ 		
+-		pRequest->request.op.operation_id = CUPS_GET_PRINTERS;
+-		pRequest->request.op.request_id   = 1;
++                (void) ippSetOperation(pRequest, CUPS_GET_PRINTERS);
++                (void) ippSetRequestId(pRequest, 1);
+ 		
+ 		pLanguage = bjcupsLangDefault();	// cupsLangDefault() -> bjcupsLangDefault() for cups-1.1.19
+ 		
+@@ -564,46 +565,42 @@ PRIVATE gint getPrinterURI(gchar *pDestName, gchar *pURI, gchar *pServerName, gi
+ 		ippAddStrings(pRequest, IPP_TAG_OPERATION, IPP_TAG_KEYWORD, "requested-attributes", sizeof(attributes) / sizeof(attributes[0]), NULL, attributes);
+ 		
+ 		if ((pResponse = cupsDoRequest(pHTTP, pRequest, "/")) != NULL) {
+-			if (pResponse->request.status.status_code > IPP_OK_CONFLICT) {
++                        if (ippGetStatusCode(pResponse) > IPP_OK_CONFLICT) {
+ 				retVal = ID_ERR_CUPS_API_FAILED;
+ 			}
+ 			else {
+-				pAttribute = pResponse->attrs;
++                          pAttribute = ippFirstAttribute(pResponse);
+ 
+-				while (pAttribute != NULL) {
+-					while (pAttribute != NULL && pAttribute->group_tag != IPP_TAG_PRINTER) {
+-						pAttribute = pAttribute->next;
+-					}
+-					if (pAttribute == NULL) {
+-						break;
+-					}
+-					
+-					while (pAttribute != NULL && pAttribute->group_tag == IPP_TAG_PRINTER) {
+-						if (strcmp(pAttribute->name, "printer-name") == 0 && pAttribute->value_tag == IPP_TAG_NAME) {
+-							pPrinter = pAttribute->values[0].string.text;
+-						}
+-						if (strcmp(pAttribute->name, "printer-uri-supported") == 0 && pAttribute->value_tag == IPP_TAG_URI) {
+-							pUri = pAttribute->values[0].string.text;
+-						}
+-						pAttribute = pAttribute->next;
+-					}
+-					
+-					// Tora 020418: Compare two printer names ignoring the character case.
+-					if (strcasecmp(pDestName, pPrinter) == 0) {
+-						strncpy(pURI, pUri, bufSize);
+-						
+-						pTemp = strstr(pURI, "//");
+-						pTemp += 2;
+-						for (i = 0; *pTemp != '/' && *pTemp != ':'; i++, pTemp++) {
+-							pServerName[i] = *pTemp;
+-						}
+-						
+-						break;
+-					}
++                          for(; pAttribute != NULL; pAttribute = ippNextAttribute(pResponse)) {
++                            if (ippGetGroupTag(pAttribute) != IPP_TAG_PRINTER) {
++                              continue;
++                            }
+ 
+-					if (pAttribute != NULL)
+-						 pAttribute = pAttribute->next;
+-				}
++                            switch (ippGetValueTag(pAttribute)) {
++                            case IPP_TAG_NAME:
++                              if (strcmp(ippGetName(pAttribute), "printer-name") == 0) {
++                                pPrinter = ippGetString(pAttribute, 0, NULL);
++                              }
++                              break;
++                            case IPP_TAG_URI:
++                              if (strcmp(ippGetName(pAttribute), "printer-uri-supported") == 0) {
++                                pUri = ippGetString(pAttribute, 0, NULL);
++                              }
++                              break;
++                            default:
++                              break;
++                            }
++                          }					
++                          // Tora 020418: Compare two printer names ignoring the character case.
++                          if (strcasecmp(pDestName, pPrinter) == 0) {
++                            strncpy(pURI, pUri, bufSize);
++						
++                            pTemp = strstr(pURI, "//");
++                            pTemp += 2;
++                            for (i = 0; *pTemp != '/' && *pTemp != ':'; i++, pTemp++) {
++                              pServerName[i] = *pTemp;
++                            }
++                          }
+ 			}
+ 			
+ 			ippDelete(pResponse);
+@@ -645,8 +642,8 @@ PUBLIC gint getDeviceURI(gchar *pDestName, gchar *pDeviceURI, gint bufSize)
+ 					*pResponse;					// Pointer to CUPS IPP response.
+ 	ipp_attribute_t	*pAttribute;				// Pointer to CUPS attributes.
+ 	cups_lang_t		*pLanguage;					// Pointer to language.
+-	gchar			*pPrinter = NULL;			// Pointer to printer name.
+-	gchar			*pDUri = NULL;				// Pointer to Device uri.
++	const gchar			*pPrinter = NULL;			// Pointer to printer name.
++	const gchar			*pDUri = NULL;				// Pointer to Device uri.
+ 	gint			retVal = ID_ERR_NO_ERROR;	// Return value.
+ /*** Parameters end ***/
+ 	
+@@ -656,9 +653,9 @@ PUBLIC gint getDeviceURI(gchar *pDestName, gchar *pDeviceURI, gint bufSize)
+ 	}
+ 	else {
+ 		pRequest = ippNew();
+-		
+-		pRequest->request.op.operation_id = CUPS_GET_PRINTERS;
+-		pRequest->request.op.request_id   = 1;
++
++                (void) ippSetOperation(pRequest, CUPS_GET_PRINTERS);
++                (void) ippSetRequestId(pRequest, 1);
+ 		
+ 		pLanguage = bjcupsLangDefault();	// cupsLangDefault() -> bjcupsLangDefault() for cups-1.1.19
+ 		
+@@ -667,40 +664,36 @@ PUBLIC gint getDeviceURI(gchar *pDestName, gchar *pDeviceURI, gint bufSize)
+ 		ippAddString(pRequest, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, NULL);
+ 		
+ 		if ((pResponse = cupsDoRequest(pHTTP, pRequest, "/")) != NULL) {
+-			if (pResponse->request.status.status_code > IPP_OK_CONFLICT) {
++                        if (ippGetStatusCode(pResponse) > IPP_OK_CONFLICT) {
+ 				retVal = ID_ERR_CUPS_API_FAILED;
+ 			}
+ 			else {
+-				pAttribute = pResponse->attrs;
++                          pAttribute = ippFirstAttribute(pResponse);
+ 
+-				while (pAttribute != NULL) {
+-					while (pAttribute != NULL && pAttribute->group_tag != IPP_TAG_PRINTER) {
+-						pAttribute = pAttribute->next;
+-					}
+-					if (pAttribute == NULL) {
+-						break;
+-					}
+-					
+-					while (pAttribute != NULL && pAttribute->group_tag == IPP_TAG_PRINTER) {
+-						if (strcmp(pAttribute->name, "printer-name") == 0 && pAttribute->value_tag == IPP_TAG_NAME) {
+-							pPrinter = pAttribute->values[0].string.text;
+-						}
+-						if (strcmp(pAttribute->name, "device-uri") == 0 && pAttribute->value_tag == IPP_TAG_URI) {
+-							pDUri = pAttribute->values[0].string.text;
+-						}
+-						pAttribute = pAttribute->next;
+-					}
++                          for (; pAttribute != NULL; pAttribute = ippNextAttribute(pResponse)) {
++                            if (ippGetGroupTag(pAttribute) != IPP_TAG_PRINTER) {
++                              continue;
++                            }
+ 
+-					if (strcasecmp(pDestName, pPrinter) == 0) {
+-						strncpy(pDeviceURI, pDUri, bufSize);
+-						break;
+-					}
+-					
+-					if (pAttribute != NULL)
+-						 pAttribute = pAttribute->next;
+-				}
++                            switch (ippGetValueTag(pAttribute)) {
++                            case IPP_TAG_NAME:
++                              if (strcmp(ippGetName(pAttribute), "printer-name") == 0) {
++                                pPrinter = ippGetString(pAttribute, 0, NULL);
++                              }
++                              break;
++                            case IPP_TAG_URI:
++                              if (strcmp(ippGetName(pAttribute), "device-uri") == 0) {
++                                pDUri = ippGetString(pAttribute, 0, NULL);
++                              }
++                              break;
++                            default:
++                              break;
++                            }
++                          }
++                          if (strcasecmp(pDestName, pPrinter) == 0) {
++                            strncpy(pDeviceURI, pDUri, bufSize);
++                          }
+ 			}
+-			
+ 			ippDelete(pResponse);
+ 		}
+ 		else {
+diff --git a/cngpijmon/src/bjcupsmon_main.c b/cngpijmon/src/bjcupsmon_main.c
+index 7ec36ff..1509104 100755
+--- a/cngpijmon/src/bjcupsmon_main.c
++++ b/cngpijmon/src/bjcupsmon_main.c
+@@ -34,6 +34,8 @@
+ 
+ #define	CNIJNPR_CMD_BASE_STR				PROG_PATH "/cnijnpr"
+ 
++static ssize_t ignore_read;
++
+ /*** Global parameters ***/
+ PUBLIC ST_PrinterStatus	gPrinterStatus;			// Printer status.
+ PUBLIC gchar			gDestName[1024];		// Destination printer name.
+@@ -170,7 +172,7 @@ PRIVATE gint initApplication(gint argc, gchar *argv[], gchar *pPrinterName)
+ 	gchar	backend_name_usb[] =	"cnijusb:/";	/* USB Backend Name */
+ 	gchar	macaddress[128];						/* macaddress */
+ 	gint	backend_Is = -1;
+-	gchar	modelIDstr[5];
++	gchar	modelIDstr[MODELID_LEN];
+ /*** Parameters end ***/
+ 
+ 
+@@ -336,15 +338,10 @@ PRIVATE gint initApplication(gint argc, gchar *argv[], gchar *pPrinterName)
+ 
+ 	} /* parents process */
+ 	else {
+-		//for bscc
+-		output_dev		Odev;
+ 	    char			buf[4096];
+ 
+ 		memset( buf, 0x00, sizeof(buf) ) ;
+ 
+-		Odev.status = 0;
+-		Odev.dev = 0;//device_type;	
+-
+ 		if( backend_Is == CANON_BJNP_BACKEND_CNIJ_NET ){
+ 			//printf("parents process : --%d\n", getpid());
+ 			close( 0 );
+@@ -575,7 +572,6 @@ PRIVATE gboolean updateUI(gchar *small_name)
+ 	static struct timeb	prevTime;
+ 	static gboolean		initTime = FALSE;
+ 	//Ver.3.10 for Network
+-	output_dev		Odev;
+     char			buf[4096];
+ /*** Parameters end ***/
+ 
+@@ -583,8 +579,6 @@ PRIVATE gboolean updateUI(gchar *small_name)
+ 	memset( buf, 0x00, sizeof(buf) ) ;
+ 	//20090202 inistialize
+ 	memset( statusStr, 0x00, sizeof(statusStr) ) ;
+-	Odev.status = 0;
+-	Odev.dev = 0;//device_type;	
+ 
+ 	if (initTime == FALSE) {
+ 		initTime = TRUE;
+@@ -639,7 +633,7 @@ PRIVATE gboolean updateUI(gchar *small_name)
+ 					/* stdin (fd 0) OK? */
+ 					retval = select(1, &rfds, NULL, NULL, &tv);
+ 					if (retval > 0)
+-						read( 0, buf, sizeof(buf));
++						ignore_read = read( 0, buf, sizeof(buf));
+ 				}
+ 				//read( 0, buf, sizeof(buf));
+ 
+@@ -650,7 +644,6 @@ PRIVATE gboolean updateUI(gchar *small_name)
+ 					retVal = ID_ERR__COLLECTING_STATUS;
+ 				}
+ 				copy_buf2statusStr(&buf[1], (St_cupssts)&statusStr);
+-				//bscc2sts(small_name, &buf[1], &Odev, (Bscc2sts_tbl)&statusStr);
+ 			}
+ 
+ 			if (retVal == ID_ERR_NO_ERROR) {
+diff --git a/cngpijmon/src/bjcupsmon_msgidset.c b/cngpijmon/src/bjcupsmon_msgidset.c
+index df89994..1ee2678 100755
+--- a/cngpijmon/src/bjcupsmon_msgidset.c
++++ b/cngpijmon/src/bjcupsmon_msgidset.c
+@@ -340,10 +340,10 @@ int chk_inklow_part1(ST_CUPSSTS *p_tbl, ST_PrinterStatus *p_sts)
+ 	char warning2[13];
+ 
+ 
+-	for(i=0; i<sizeof(warning); i++)	warning[i] = SPACE;
+ 	for(i=0; i<sizeof(warning1); i++)	warning1[i] = SPACE;
+ 	for(i=0; i<sizeof(warning2); i++)	warning2[i] = SPACE;
+-	for(i=0; i<sizeof(warning); i++)	warning[i] = p_tbl->warning[i];
++	for(i=0; i<sizeof(warning) - 1; i++)	warning[i] = p_tbl->warning[i];
++        warning[12] = SPACE;
+ 
+ 	/* Ver.3.00 for DWS=1499 & DWS=1500 */
+ 	for(i=0; i<sizeof(warning); i++){
+diff --git a/cngpijmon/src/bjcupsmon_ui.c b/cngpijmon/src/bjcupsmon_ui.c
+index 16d1907..6c5f883 100755
+--- a/cngpijmon/src/bjcupsmon_ui.c
++++ b/cngpijmon/src/bjcupsmon_ui.c
+@@ -1387,13 +1387,13 @@ PRIVATE void insertStringToText_NoConv(const gchar *pWidgetName, const gchar *pS
+ // 
+ PRIVATE void freezeText(const gchar *pWidgetName, gboolean freeze)
+ {
++#ifdef USE_GTK12
+ /*** Parameters start ***/
+ 	GtkWidget	*widget = NULL;		// Temporary pointer to widget.
+ /*** Parameters end ***/
+ 	
+ 	widget = lookupWidget(pWidgetName);
+ 
+-#ifdef USE_GTK12
+ 	if (freeze == TRUE) {
+ 		gtk_text_freeze(GTK_TEXT(widget));
+ 	}
+diff --git a/cnijfilter/src/bjfimage.c b/cnijfilter/src/bjfimage.c
+index 4006f9d..dbb0406 100755
+--- a/cnijfilter/src/bjfimage.c
++++ b/cnijfilter/src/bjfimage.c
+@@ -39,6 +39,7 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <png.h>
+ 
+ #include "cpktypes.h"
+@@ -47,6 +48,7 @@
+ #include "bjfimage.h"
+ #include "bjferror.h"
+ 
++static size_t unused_fread;
+ 
+ /* function prototypes */
+ short bjf_image_open( LPBJF_IMAGEINFO, char * );
+@@ -606,7 +608,7 @@ static short bmp_image_open( LPBJF_IMAGEINFO lpbjfimage, char *filename )
+ 
+ 	if ( filename != NULL ){
+ 		if ( (readfp = fopen( filename, "rb" )) == NULL ) goto onErr;
+-		fread( buffer, 2, 1, readfp );
++		unused_fread = fread( buffer, 2, 1, readfp );
+ 	}
+ 	else
+ 		readfp = stdin;
+@@ -800,18 +802,18 @@ static short bmp_image_read_raster( LPBJF_IMAGEINFO lpbjfimage, char *buf, long
+ 		
+ 		if ( isfinalblock == 1 ){
+ 			for ( i=0; i<(block-1); i++ ){
+-				fread( rawbuf[0], rasterlength, rstep, readfp );
++				unused_fread = fread( rawbuf[0], rasterlength, rstep, readfp );
+ 				lpbjfimage->readraster += rstep;
+ 			}
+ 			/*--- read reverse ---*/
+ 			fseek( readfp, 54L, SEEK_SET );
+-			fread( rawbuf[rstep-laststep], rasterlength, laststep, readfp );
++			unused_fread = fread( rawbuf[rstep-laststep], rasterlength, laststep, readfp );
+ 			lpbjfimage->readraster += laststep;
+ 		}
+ 		else{
+ 			/*--- read reverse ---*/
+ 			fseek( readfp, ( rasterlength * (img_height - rstep - top) + 54L ), SEEK_SET );
+-			fread( rawbuf[0], rasterlength, rstep, readfp );
++			unused_fread = fread( rawbuf[0], rasterlength, rstep, readfp );
+ 			lpbjfimage->readraster += rstep;
+ 		}	
+ 	}
+@@ -871,7 +873,7 @@ static short bmp_image_flush( LPBJF_IMAGEINFO lpbjfimage )
+ 	if ( remain > 0 ){
+ 		if ( (tmp = malloc( remain * rasterlength )) == NULL ) goto onErr;
+ 	
+-		fread( tmp, rasterlength, remain, readfp );
++		unused_fread = fread( tmp, rasterlength, remain, readfp );
+ 		
+ 		lpbjfimage->readraster = 0;
+ 
+@@ -920,7 +922,7 @@ static short ppm_image_open( LPBJF_IMAGEINFO lpbjfimage, char *filename )
+ 
+ 	if ( filename != NULL ){
+ 		if ( (readfp = fopen( filename, "rb" )) == NULL ) goto onErr;
+-		fread( buffer, 2, 1, readfp );
++		unused_fread = fread( buffer, 2, 1, readfp );
+ 	}
+ 	else {
+ 		readfp = stdin;
+@@ -1102,15 +1104,15 @@ static short ppm_image_read_raster
+ 
+ 		if ( isfinalblock == 1 ){
+ 			for ( i=0; i<(block-1); i++ ){
+-				fread( rawbuf[0], RasterLength, rstep, readfp );
++				unused_fread = fread( rawbuf[0], RasterLength, rstep, readfp );
+ 				lpbjfimage->readraster += rstep;			 
+ 			}
+-			fread( rawbuf[0], RasterLength, laststep, readfp );
++			unused_fread = fread( rawbuf[0], RasterLength, laststep, readfp );
+ 			lpbjfimage->readraster += laststep; 
+ 		}
+ 		else{
+ 			for ( i=0; i<block; i++ ){
+-				fread( rawbuf[0], RasterLength, rstep, readfp );
++				unused_fread = fread( rawbuf[0], RasterLength, rstep, readfp );
+ 				lpbjfimage->readraster += rstep;
+ 			}
+ 		}
+@@ -1155,7 +1157,7 @@ static short ppm_image_flush( LPBJF_IMAGEINFO lpbjfimage )
+ 
+ 	if ( remain > 0 ){
+ 		if ( (tmp = malloc( remain * (width*bpp))) == NULL ) goto onErr;
+-		fread( tmp, RasterLength, remain, readfp );
++		unused_fread = fread( tmp, RasterLength, remain, readfp );
+ 		lpbjfimage->readraster = 0;
+ 	}
+ 
+@@ -1494,7 +1496,7 @@ static short png_image_open( LPBJF_IMAGEINFO lpbjfimage, char *filename )
+ 
+ 	if ( filename != NULL ){
+ 		if ( (readfp = fopen( filename, "rb" )) == NULL ) goto onErr;
+-		fread( buffer, 8, 1, readfp );
++		unused_fread = fread( buffer, 8, 1, readfp );
+ 	}
+ 	else {
+ 		readfp = stdin;
+@@ -1574,7 +1576,7 @@ static short png_image_init( LPBJF_IMAGEINFO lpbjfimage )
+ 		goto onErr;
+ 	}
+ 
+-	if (setjmp (png_p->jmpbuf))
++	if (setjmp (png_jmpbuf(png_p)))
+ 	{
+ 		png_destroy_read_struct(&png_p, &info_p, (png_infopp)NULL);
+ 		goto onErr;
+@@ -1585,7 +1587,7 @@ static short png_image_init( LPBJF_IMAGEINFO lpbjfimage )
+ 
+ 	png_read_info( png_p, info_p );
+ 
+-	png_get_IHDR( png_p, info_p, (unsigned long *)&width, (unsigned long *)&length, &bit_depth,
++	png_get_IHDR( png_p, info_p, (png_uint_32 *)&width, (png_uint_32 *)&length, &bit_depth,
+ 	              &color_type, &interlace_type, NULL, NULL);
+ 
+ 	/* not support Interlace */
+@@ -1835,7 +1837,7 @@ int ppm_write_tmpfile( LPBJF_IMAGEINFO lpbjfimage, char *filename , char *outfil
+ 	
+ 	if ( filename != NULL ){
+ 		if ( (readfp = fopen( filename, "rb" )) == NULL ) goto onErr;
+-		fread( buffer, 2, 1, readfp );
++		unused_fread = fread( buffer, 2, 1, readfp );
+ 	}
+ 	else {
+ 		readfp = stdin;
+diff --git a/cnijfilter/src/getipc.c b/cnijfilter/src/getipc.c
+index 3027364..890a694 100755
+--- a/cnijfilter/src/getipc.c
++++ b/cnijfilter/src/getipc.c
+@@ -34,6 +34,7 @@
+ #include "bjipc.h"
+ #include "cncldef.h"
+ 
++static ssize_t ignored_read;
+ 
+ short GetIPCData( LPIPCU , char *);
+ 
+@@ -63,12 +64,12 @@ short GetIPCData(LPIPCU pipc, char *sname)
+ 	if (listen(s, 5))
+ 		return RET_ERROR;
+ 
+-	while ((c = accept(s, (struct sockaddr *)&sun, &adrlen)) >= 0) {
++	while ((c = accept(s, (struct sockaddr *)&sun, (socklen_t *)&adrlen)) >= 0) {
+ 		/* read command first */
+-		read(c, buf, IPCCMDLEN);
++		ignored_read = read(c, buf, IPCCMDLEN);
+ 
+ 		if (strcmp(buf, "PRINT") == 0) {			/* PRINT command */
+-			read(c, pipc, sizeof(IPCU));
++			ignored_read = read(c, pipc, sizeof(IPCU));
+ 			close(c);
+ 			ret = RET_PRINT;
+ 			break;
+@@ -79,13 +80,13 @@ short GetIPCData(LPIPCU pipc, char *sname)
+ 			break;
+ 		}
+ 		else if (strcmp(buf, "PDATA") == 0) {		/* PDATA command (for maintenance) */
+-			read(c, pipc, sizeof(IPCU));
++			ignored_read = read(c, pipc, sizeof(IPCU));
+ 			close(c);
+ 			ret = RET_PDATA;
+ 			break;
+ 		}
+ 		else if (strcmp(buf, "FDATA") == 0) {		/* FDATA command (to print testpattern) */
+-			read(c, pipc, sizeof(IPCU));
++			ignored_read = read(c, pipc, sizeof(IPCU));
+ 			close(c);
+ 			ret = RET_FDATA;
+ 			break;
+diff --git a/lgmon/src/560ifunc.c b/lgmon/src/560ifunc.c
+index a7f368b..3fc5cf3 100755
+--- a/lgmon/src/560ifunc.c
++++ b/lgmon/src/560ifunc.c
+@@ -90,7 +90,8 @@ int pixus560i_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_tb
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
+-
++  if(ret);
++  
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+   }
+diff --git a/lgmon/src/850ifunc.c b/lgmon/src/850ifunc.c
+index 085a0bf..e6cb3ea 100755
+--- a/lgmon/src/850ifunc.c
++++ b/lgmon/src/850ifunc.c
+@@ -90,6 +90,7 @@ int pixus850i_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_tb
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
++  if(ret);
+ 
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+diff --git a/lgmon/src/860ifunc.c b/lgmon/src/860ifunc.c
+index d3da66c..fa6a6c8 100755
+--- a/lgmon/src/860ifunc.c
++++ b/lgmon/src/860ifunc.c
+@@ -90,7 +90,8 @@ int pixus860i_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_tb
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
+-
++  if(ret);
++  
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+   }
+diff --git a/lgmon/src/950ifunc.c b/lgmon/src/950ifunc.c
+index ce4dd9f..6b51adf 100755
+--- a/lgmon/src/950ifunc.c
++++ b/lgmon/src/950ifunc.c
+@@ -132,7 +132,8 @@ int pixus950i_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_tb
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
+-
++  if(ret);
++  
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+   }
+diff --git a/lgmon/src/990ifunc.c b/lgmon/src/990ifunc.c
+index 7468aa0..11db08c 100755
+--- a/lgmon/src/990ifunc.c
++++ b/lgmon/src/990ifunc.c
+@@ -132,7 +132,8 @@ int pixus990i_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_tb
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
+-
++  if(ret);
++  
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+   }
+diff --git a/lgmon/src/ip3100func.c b/lgmon/src/ip3100func.c
+index 0ef37cf..8247615 100755
+--- a/lgmon/src/ip3100func.c
++++ b/lgmon/src/ip3100func.c
+@@ -90,7 +90,8 @@ int pixusip3100_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
+-
++  if(ret);
++  
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+   }
+diff --git a/lgmon/src/ip4100func.c b/lgmon/src/ip4100func.c
+index c1d01c7..806ee63 100755
+--- a/lgmon/src/ip4100func.c
++++ b/lgmon/src/ip4100func.c
+@@ -90,7 +90,8 @@ int pixusip4100_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
+-
++  if(ret);
++  
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+   }
+diff --git a/lgmon/src/ip8600func.c b/lgmon/src/ip8600func.c
+index c25fca2..7e97571 100755
+--- a/lgmon/src/ip8600func.c
++++ b/lgmon/src/ip8600func.c
+@@ -132,7 +132,8 @@ int pixusip8600_setoperate(ST_STORESET *p_s, ST_BSCC2STS *p_ct, bscc2sts_tbl *p_
+   }
+ 
+   ret = com_setoperate( p_s, p_ct, p_tbl);
+-
++  if(ret);
++  
+   for(i=0;i<12;i++){
+   	if( p_tbl->warning[i] == 'g' ) break;
+   }
+diff --git a/lgmon/src/langmon.c b/lgmon/src/langmon.c
+index ad20acc..bd2b304 100755
+--- a/lgmon/src/langmon.c
++++ b/lgmon/src/langmon.c
+@@ -283,6 +283,7 @@ static int print_normal()
+ 	}
+ 
+ print_normal_exit:
++        if(error);
+ 	if(term_sig)
+ 		do_printer_reset(1);
+ 
+diff --git a/lgmon/src/lm.h b/lgmon/src/lm.h
+index 96b59ac..52f4e36 100755
+--- a/lgmon/src/lm.h
++++ b/lgmon/src/lm.h
+@@ -66,10 +66,10 @@
+ 
+ /* dispatch fanction struct */
+ typedef struct ptdev_func {
+-	int (*ptdev_read)();   /* device Read  function pointer */
+-	int (*ptdev_write)();  /* device Write function pointer */
+-	int (*ptdev_ioctl)();  /* device Ioctl function pointer */
+-	int (*ptdev_poll)();   /* device Poll  function pointer */
++  int (*ptdev_read)(int,char*,int);   /* device Read  function pointer */
++  int (*ptdev_write)(int,char*,int);  /* device Write function pointer */
++  int (*ptdev_ioctl)(int,int,...);  /* device Ioctl function pointer */
++  int (*ptdev_poll)(void*,unsigned int,int);   /* device Poll  function pointer */
+ } ptdev_func,*Ptdev_func;
+ 
+ /* printer status read back struct */
+@@ -86,9 +86,9 @@ int read_1394_p(int, char*, int);
+ int write_lp_p(int, char*, int);   /* write */
+ int write_usb_p(int, char*, int);
+ int write_1394_p(int, char*, int);
+-int ioctl_lp_p(int, int, int);         /* ioctl */
+-int ioctl_usb_p(int, int, int);
+-int ioctl_1394_p(int, int, int);
++int ioctl_lp_p(int, int, ...);         /* ioctl */
++int ioctl_usb_p(int, int, ...);
++int ioctl_1394_p(int, int, ...);
+ int poll_lp_p(void*, unsigned int, int);   /* poll */
+ int poll_usb_p(void*, unsigned int, int);
+ int poll_1394_p(void*, unsigned int, int);
+diff --git a/lgmon/src/lm_print.c b/lgmon/src/lm_print.c
+index d5e6fff..03c4d8d 100755
+--- a/lgmon/src/lm_print.c
++++ b/lgmon/src/lm_print.c
+@@ -245,13 +245,17 @@ static unsigned int data_output_main(int sm_sock_fd, int fix_size)
+ 		ptr = buf;
+ 		/* data print(output) loop */
+ 		for(;r_size > 0;r_size -= w_size){
++#ifdef DEBUG
+ 			int err;
++#endif
+ 
+ 			signal_block(sigmask);   /* signal block */
+ 			get_printer_sem(sem_id); /* printer lock */
+ 
+ 			w_size = p_dvacs->ptdev_write(dev_path, ptr, r_size); /* data write -> printer */
++#ifdef DEBUG
+ 			err = errno;
++#endif
+ #ifdef DATA_LOG
+ 			if(log_hand >=0 && w_size > 0)
+ 				write(log_hand, ptr, w_size);
+diff --git a/lgmon/src/lm_status.c b/lgmon/src/lm_status.c
+index 41b6ed6..7f936e1 100755
+--- a/lgmon/src/lm_status.c
++++ b/lgmon/src/lm_status.c
+@@ -448,7 +448,6 @@ static short PreparePrint( char *jobIDStr, short jobIDStrlen )
+ 	int dev_path = PRNT_PATH;
+ 	short	cnclerr = -1;
+ 	char *cmd_wrbuf = NULL;
+-	short i=0;
+ 
+ 	/* write command buffer */
+ 	cmd_wrbuf = (char *)malloc(MAX_STATBUF); /* 4096 */
+@@ -509,7 +508,6 @@ static short PreparePrint( char *jobIDStr, short jobIDStrlen )
+ 
+ 		/* wait "CNCL_CHECK_START2:response" */
+ 		cnclerr = -1;
+-		i = 0;
+ 		while( cnclerr != CNCL_OK ){
+ #ifdef DEBUG
+ 			fprintf(log_path, "CNCL_CHECK_START2:response @  i : %d\n",i);
+diff --git a/lgmon/src/lm_sub.c b/lgmon/src/lm_sub.c
+index 2e5e6f9..8328e79 100755
+--- a/lgmon/src/lm_sub.c
++++ b/lgmon/src/lm_sub.c
+@@ -39,6 +39,7 @@
+ #include	<signal.h>
+ #include	<sys/ioctl.h>
+ #include	<stdlib.h>
++#include        <stdarg.h>
+ #include	<errno.h>					/* asm/errno.h -> errno.h */
+ 
+ #include	"lmsmsock.h"
+@@ -50,6 +51,7 @@
+ #include "cncldef.h"
+ #include "cnclcmdutils.h"
+ 
++static ssize_t ignore_write;
+ 
+ /* semapho union define */
+ union semun
+@@ -94,9 +96,19 @@ int write_lp_p(int dev_path, char *buf, int size)
+ 	return write(dev_path, (void *)buf, (size_t)size);
+ }
+ 
+-int ioctl_lp_p(int dev_path, int request , int arg)
+-{
+-	return ioctl(dev_path, request, arg);
++int ioctl_lp_p(int dev_path, int request , ...)
++{
++  va_list args;
++  va_start(args, request);
++  switch(request) {
++  case LPABORT: case LPRESET:
++    return ioctl(dev_path, request, va_arg(args, int));
++  case LPGETSTATUS:
++    return ioctl(dev_path, request, va_arg(args, int *));
++  default: break;
++  }
++  va_end(args);
++  return 0;
+ }
+ 
+ int poll_lp_p(void *ptr, unsigned int nfds, int timeout)
+@@ -117,9 +129,20 @@ int write_usb_p(int dev_path, char *buf, int size)
+ 	return write(dev_path, (void *)buf, (size_t)size);
+ }
+ 
+-int ioctl_usb_p(int dev_path, int request , int arg)
++int ioctl_usb_p(int dev_path, int request , ...)
+ {
+-	return ioctl(dev_path, request, arg);
++
++  va_list args;
++  va_start(args, request);
++  switch(request) {
++  case LPABORT: case LPRESET:
++    return ioctl(dev_path, request, va_arg(args, int));
++  case LPGETSTATUS:
++    return ioctl(dev_path, request, va_arg(args, int *));
++  default: break;
++  }
++  va_end(args);
++  return 0;
+ }
+ 
+ int poll_usb_p(void *ptr, unsigned int nfds, int timeout)
+@@ -140,7 +163,7 @@ int write_1394_p(int dev_path, char *buf, int size)
+ 	return 0;
+ }
+ 
+-int ioctl_1394_p(int dev_path, int request , int arg)
++int ioctl_1394_p(int dev_path, int request , ...)
+ {
+ 	return 0;
+ }
+@@ -472,7 +495,7 @@ int get_printer_status(int dev_path, char *buf, int *reg, int *bytes)
+                 return 0;
+         }
+ 
+-	error = p_dvacs->ptdev_ioctl(dev_path, LPGETSTATUS, (int)&status);
++	error = p_dvacs->ptdev_ioctl(dev_path, LPGETSTATUS, &status);
+ 	if(!error){
+ 		*reg = status;
+ 		return 0;
+@@ -789,8 +812,7 @@ int write_status_info( struct bjst_rback *rback, int r_bytes, char *buf )
+ 		//fflush(log_path);
+ #endif
+ 		if( ret3 == CNCL_OK ){
+-			memset( buf, 0, sizeof(buf) );
+-			memcpy( &buf[0], &buf2[0], MAX_STATBUF );
++                  memcpy( buf, buf2, MAX_STATBUF);
+ 		}
+ 		else
+ 			goto Err01;
+@@ -799,7 +821,7 @@ int write_status_info( struct bjst_rback *rback, int r_bytes, char *buf )
+ 	ret3 = bscc2sts(PACKAGE_PRINTER_MODEL, buf, &odev, &info_sts.sts);
+ 
+ 	if(rback->rback_handle > 0 && ret3 == OK )	
+-		write(rback->rback_handle, (void *)&info_sts, (size_t)sizeof(info_sts));
++		ignore_write = write(rback->rback_handle, (void *)&info_sts, (size_t)sizeof(info_sts));
+ #ifdef DEBUG
+ 	else {
+ 		fprintf(log_path,"Status Convert Error rback_handle:%d lib_stat:%d\n",rback->rback_handle,ret3);
+diff --git a/printui/po/id.po b/printui/po/id.po
+index 49828ae..4517302 100755
+--- a/printui/po/id.po
++++ b/printui/po/id.po
+@@ -1447,8 +1447,8 @@ msgid ""
+ "Paper Source: %s is not available for the selected Media Type.\n"
+ "Paper Source setting has been changed to %s."
+ msgstr ""
+-"Setelan Sumber Kertas saat ini tidak tersedia untuk Tipe Media yang dipilih.\n"
+-"Setelan Sumber Kertas telah diubah."
++"Setelan Sumber Kertas %s saat ini tidak tersedia untuk Tipe Media yang dipilih.\n"
++"Setelan Sumber Kertas telah diubah %s."
+ 
+ #. bkenh_enh
+ #: po/keystr.h:342
+diff --git a/printui/src/callbacks.c b/printui/src/callbacks.c
+index e0c7d3e..ab5e779 100755
+--- a/printui/src/callbacks.c
++++ b/printui/src/callbacks.c
+@@ -1205,18 +1205,15 @@ on_default_button_clicked              (GtkButton       *button,
+ 
+ 			if( value[i] == quality_value )
+ 			{
+-				gtk_toggle_button_set_active(
+-					GTK_TOGGLE_BUTTON(LookupWidget(UI_DIALOG(g_main_window)->window,g_quality_button_name[i])), TRUE);
++				gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), TRUE);
+ #ifdef _PRINTUI_DEBUG_
+ 				fprintf(stderr,"default 3position=%s\n",g_quality_button_name[i]);
+ #endif
+ 				break;
+ 			}
+ 		}
+-		if( i == 3 ){
+-			gtk_toggle_button_set_active(
+-				GTK_TOGGLE_BUTTON(LookupWidget(UI_DIALOG(g_main_window)->window,"quality_standard_button")), TRUE);
+-		}
++                gtk_toggle_button_set_active(
++			GTK_TOGGLE_BUTTON(LookupWidget(UI_DIALOG(g_main_window)->window,"quality_standard_button")), TRUE);
+ 	}
+ 
+ #if 0
+diff --git a/printui/src/colordlg2.c b/printui/src/colordlg2.c
+index 55a0b97..f90b64d 100755
+--- a/printui/src/colordlg2.c
++++ b/printui/src/colordlg2.c
+@@ -165,7 +165,7 @@ static short SetGammaCombo(UIColorDialog2* dialog, short gamma)
+ }
+ 
+ /* Ver.2.90 */
+-static short CofirmSpinValue( spinbutton )
++static short CofirmSpinValue(GtkSpinButton* spinbutton)
+ {
+ 	short	result = 0;
+ 
+diff --git a/printui/src/ipcproc.c b/printui/src/ipcproc.c
+index f5fe256..fd90acd 100755
+--- a/printui/src/ipcproc.c
++++ b/printui/src/ipcproc.c
+@@ -46,6 +46,8 @@
+ 
+ #define IVEC_BUF_SIZE (1024)
+ 
++static ssize_t ignored_write;
++
+ static int ConnectToServer()
+ {
+ 	int fd;
+@@ -82,10 +84,10 @@ int PutIPCData(LPIPCU pipc)
+ 	// Write "PRINT" command first.
+ 	strncpy(buf, "PRINT", IPCCMDLEN);
+ 	buf[IPCCMDLEN -1] = '\0';
+-	write(fd, buf, IPCCMDLEN);
++	ignored_write = write(fd, buf, IPCCMDLEN);
+ 
+ 	// And for the time being, simply just write the contents of pipc.
+-	write(fd, pipc, sizeof(IPCU));
++	ignored_write = write(fd, pipc, sizeof(IPCU));
+ 
+ 	close(fd);
+ 	return 0;
+@@ -102,7 +104,7 @@ int PutCancel()
+ 	// Write "CANCEL" command.
+ 	strncpy(buf, "CANCEL", IPCCMDLEN);
+ 	buf[IPCCMDLEN -1] = '\0';
+-	write(fd, buf, IPCCMDLEN);
++	ignored_write = write(fd, buf, IPCCMDLEN);
+ 
+ 	close(fd);
+ 	return 0;
+@@ -122,7 +124,7 @@ int PutPrintData(char *cmdsbuf, short length)
+ 	// Write "PDATA" command first.
+ 	strncpy(buf, "PDATA", IVEC_BUF_SIZE);
+ 	buf[IVEC_BUF_SIZE -1] = '\0';
+-	write(fd, buf, IPCCMDLEN);
++	ignored_write = write(fd, buf, IPCCMDLEN);
+ 
+ 	if ( (IsIVECModel() == TRUE) && (g_bidi_mode == FALSE) ){
+ 		curPtr = ipc.cmds.cmds;
+@@ -161,7 +163,7 @@ int PutPrintData(char *cmdsbuf, short length)
+ 		memcpy(ipc.cmds.cmds, cmdsbuf, length);
+ 	}	
+ 
+-	write(fd, &ipc, sizeof(IPCU));
++	ignored_write = write(fd, &ipc, sizeof(IPCU));
+ 	retVal = 0;
+ Err2:
+ 	close(fd);
+@@ -178,9 +180,11 @@ int PutDeviceData(char *cmdsbuf, short length, char *devMode )
+ 	short cmdType;
+ 	int retVal = -1;
+ 	char *curPtr;
++#if 0
+ 	char *model_name;
+ 
+ 	model_name = GetModelName();
++#endif
+ 
+ 	if ( (devMode == NULL) || (devMode == NULL) ) goto Err1;
+ 
+@@ -196,7 +200,7 @@ int PutDeviceData(char *cmdsbuf, short length, char *devMode )
+ 	// Write "POWEROFF" command first.
+ 	strncpy(buf, devMode, IVEC_BUF_SIZE);
+ 	buf[IVEC_BUF_SIZE-1] = '\0';
+-	write(fd, buf, IPCCMDLEN);
++	ignored_write = write(fd, buf, IPCCMDLEN);
+ 
+ 	if ( (IsIVECModel() == TRUE) ){
+ 		curPtr = ipc.cmds.cmds;
+@@ -242,7 +246,7 @@ int PutDeviceData(char *cmdsbuf, short length, char *devMode )
+ 		memcpy( ipc.cmds.cmds, cmdsbuf, length );
+ 	}
+ 
+-	write(fd, &ipc, sizeof(IPCU));
++	ignored_write = write(fd, &ipc, sizeof(IPCU));
+ 	retVal = 0;
+ Err2:
+ 	close(fd);
+@@ -265,14 +269,14 @@ int PutFileData(char *cmdsbuf, short cmds_length,
+ 	// Write "FDATA" command first.
+ 	strncpy(buf, "FDATA", IPCCMDLEN);
+ 	buf[IPCCMDLEN -1] = '\0';
+-	write(fd, buf, IPCCMDLEN);
++	ignored_write = write(fd, buf, IPCCMDLEN);
+ 
+ 	// Prepare for ipc union, then copy buffer data.
+ 	ipc.fncmds.cmdslen = (long)cmds_length;
+ 	ipc.fncmds.filenamelen = (long)fname_length;
+ 	memcpy(ipc.fncmds.cmds, cmdsbuf, cmds_length);
+ 	memcpy(ipc.fncmds.filename, fnamebuf, fname_length);
+-	write(fd, &ipc, sizeof(IPCU));
++	ignored_write = write(fd, &ipc, sizeof(IPCU));
+ 
+ 	close(fd);
+ 	return 0;
+@@ -292,14 +296,14 @@ int PutDoubleData(char *cmdsbuf, short cmds_length,
+ 	// Write "FDATA" command first.
+ 	strncpy(buf, "WDATA", IPCCMDLEN);
+ 	buf[IPCCMDLEN -1] = '\0';
+-	write(fd, buf, IPCCMDLEN);
++	ignored_write = write(fd, buf, IPCCMDLEN);
+ 
+ 	// Prepare for ipc union, then copy buffer data.
+ 	ipc.fncmds.cmdslen = (long)cmds_length;
+ 	ipc.fncmds.filenamelen = (long)fname_length;
+ 	memcpy(ipc.fncmds.cmds, cmdsbuf, cmds_length);
+ 	memcpy(ipc.fncmds.filename, fnamebuf, fname_length);
+-	write(fd, &ipc, sizeof(IPCU));
++	ignored_write = write(fd, &ipc, sizeof(IPCU));
+ 
+ 	close(fd);
+ 	return 0;
+@@ -316,7 +320,7 @@ int PutExecLM()
+ 	// Write "EXECLM" command.
+ 	strncpy(buf, "EXECLM", IPCCMDLEN);
+ 	buf[IPCCMDLEN -1] = '\0';
+-	write(fd, buf, IPCCMDLEN);
++	ignored_write = write(fd, buf, IPCCMDLEN);
+ 
+ 	close(fd);
+ 	return 0;
+diff --git a/printui/src/keytext.c b/printui/src/keytext.c
+index 46d9829..9fe20a7 100755
+--- a/printui/src/keytext.c
++++ b/printui/src/keytext.c
+@@ -65,7 +65,7 @@ static gint TreeTraverseFunc(gpointer key, gpointer value, gpointer data)
+ 
+ static void FreeTree(GTree* tree)
+ {
+-	g_tree_traverse(tree, TreeTraverseFunc, G_IN_ORDER, NULL);
++	g_tree_foreach(tree, TreeTraverseFunc, NULL);
+ 	g_tree_destroy(tree);
+ }
+ 
+@@ -73,7 +73,7 @@ static void AddKeyAndTextToTree(xmlNodePtr xmlnode, GTree* tree)
+ {
+ 	char *key, *text;
+ 
+-	if( !xmlnode->name || g_strcasecmp((const gchar *)xmlnode->name,"Item") != 0 )
++	if( !xmlnode->name || g_ascii_strcasecmp((const gchar *)xmlnode->name,"Item") != 0 )
+ 		return;
+ 
+ 	key  = g_strdup((const gchar *)xmlGetProp(xmlnode,(const xmlChar *)"key"));
+@@ -114,7 +114,7 @@ static gboolean ReadXMLFile(char *fname, GTree* tree)
+ #endif
+ 	if( doc->xmlRootNode == NULL
+ 	 || doc->xmlRootNode->name == NULL
+-	 || g_strcasecmp((const gchar *)doc->xmlRootNode->name, "KeyTextList") != 0)
++	 || g_ascii_strcasecmp((const gchar *)doc->xmlRootNode->name, "KeyTextList") != 0)
+ 	{
+ 		xmlFreeDoc(doc);
+ 		return FALSE;
+@@ -195,7 +195,7 @@ gchar* LookupKey(KeyTextList* list, const gchar* text)
+ 		return NULL;
+ 
+ 	g_reverse_key = NULL;
+-	g_tree_traverse(list->tree, ReverseSearchFunc, G_IN_ORDER, (gpointer)text);
++	g_tree_foreach(list->tree, ReverseSearchFunc, (gpointer)text);
+ 
+ 	return g_reverse_key;
+ }
+diff --git a/printui/src/loadres.c b/printui/src/loadres.c
+index 11c5231..0d899a5 100755
+--- a/printui/src/loadres.c
++++ b/printui/src/loadres.c
+@@ -87,7 +87,9 @@ int LoadResources()
+ 					 G_DIR_SEPARATOR_S "locale-table", "r");
+ 
+ 	char* env_locale;
++#ifdef	USE_LIB_GLADE
+ 	char* glade_name;
++#endif        
+ 	char* keytext_name;
+ 	char* unit_name;
+ 	gboolean last = 0;
+@@ -100,7 +102,7 @@ int LoadResources()
+ 
+ #ifdef USE_PO_LOCALE
+ 	/* LUM_LID_LOCALE */
+-	/env_locale = _("Locale");
++	env_locale = _("Locale");
+ #else
+ 	if( (env_locale = getenv("LANG")) == NULL )
+ 		env_locale = "";
+@@ -111,7 +113,9 @@ int LoadResources()
+ 	{
+ 		if( fp == NULL || env_locale == NULL )
+ 		{
++#ifdef	USE_LIB_GLADE                  
+ 			glade_name   = DEFAULT_GLADE_FILE;
++#endif                        
+ 			keytext_name = DEFAULT_KEYTEXT_FILE;
+ 			unit_name    = DEFAULT_UNIT_MM;
+ 			last = TRUE;
+@@ -130,7 +134,9 @@ int LoadResources()
+ 				{
+ 					if( strlen(glade) > 0 && strlen(keytext) > 0 )
+ 					{
++#ifdef	USE_LIB_GLADE                                          
+ 						glade_name   = glade;
++#endif                                                
+ 						keytext_name = keytext;
+ 						unit_name    = unit;
+ 						break;
+@@ -139,7 +145,9 @@ int LoadResources()
+ 			}
+ 			if( bytes < 0 )
+ 			{
++#ifdef	USE_LIB_GLADE
+ 				glade_name   = DEFAULT_GLADE_FILE;
++#endif
+ 				keytext_name = DEFAULT_KEYTEXT_FILE;
+ 				unit_name    = DEFAULT_UNIT_MM;
+ 				last = TRUE;
