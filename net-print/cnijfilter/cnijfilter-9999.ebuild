@@ -9,26 +9,28 @@ DESCRIPTION="Canon InkJet Printer Driver for Linux (PIXMA MG5300 series)."
 HOMEPAGE="http://support-sg.canon-asia.com/contents/SG/EN/0100392802.html"
 SRC_URI="http://gdlp01.c-wss.com/gds/8/0100003928/01/cnijfilter-source-3.60-1.tar.gz"
 
+USE="+mg5300"
 PRINTER_USE=mg5300
 PRINTER_ID=389
 
 LICENSE="GPL-2 cnijfilter"
 KEYWORDS="~amd64"
-SLOT=${PRINTER_USE}
+SLOT=0
 
 RDEPEND="
 	>=media-libs/libpng-1.0.9
 	>=media-libs/tiff-3.4
-	>=net-print/cups-1.4
+	>=net-print/cups-1.7
 	>=dev-libs/libxml2-2.7.3-r2
 	>=x11-libs/gtk+-2.6:2
+	>=app-text/ghostscript-gpl-5.50
 "
 DEPEND="${DEPEND}
 	sys-devel/gettext
 "
 
 S="${WORKDIR}/cnijfilter-source-3.60-1"
-SRC_DIRS=("ppd" "cnijfilter" "printui" "lgmon" "cngpijmon")
+SRC_DIRS=("libs" "ppd" "backend" "backendnet" "cnijfilter" "pstocanonij" "printui" "lgmon" "cngpijmon")
 
 pkg_setup() {
 	[[ -z ${LINGUAS} ]] && LINGUAS="en"
@@ -52,12 +54,7 @@ src_configure() {
 	for d in ${SRC_DIRS[@]}; do
 		echo ">>> Working in: ${d}"
 		pushd ${d} >/dev/null
-		econf --prefix="${EPREFIX}/usr" \
-			  --program-suffix="${PRINTER_USE}" \
-			  --datadir="${EPREFIX}/usr/share" \
-			  --enable-progpath="${EPREFIX}/usr/bin" \
-			  --enable-libpath="${EPREFIX}/usr/lib64/bjlib" \
-			  --enable-binpath="${EPREFIX}/usr/bin"
+		econf --program-suffix="${PRINTER_USE}"
 		popd > /dev/null
 	done
 }
