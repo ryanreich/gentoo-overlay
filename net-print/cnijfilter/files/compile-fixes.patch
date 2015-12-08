@@ -1,3 +1,15 @@
+diff --git a/backend/src/Makefile.am b/backend/src/Makefile.am
+index ff21cb5..d56f995 100755
+--- a/backend/src/Makefile.am
++++ b/backend/src/Makefile.am
+@@ -1,6 +1,6 @@
+ ## Process this file with automake to produce Makefile.in
+ 
+-backend_bindir = /usr/lib/cups/backend
++backend_bindir = /usr/libexec/cups/backend
+ backend_bin_PROGRAMS = cnijusb
+ transform = 
+ 
 diff --git a/backend/src/cnij_backend_common.c b/backend/src/cnij_backend_common.c
 index 635df05..7c719ed 100755
 --- a/backend/src/cnij_backend_common.c
@@ -11,6 +23,18 @@ index 635df05..7c719ed 100755
  
  // Header file for CANON
  #include "cnij_backend_common.h"
+diff --git a/backendnet/backend/Makefile.am b/backendnet/backend/Makefile.am
+index 49e3765..390844b 100755
+--- a/backendnet/backend/Makefile.am
++++ b/backendnet/backend/Makefile.am
+@@ -1,6 +1,6 @@
+ ## Process this file with automake to produce Makefile.in
+ 
+-backendnet_bindir = /usr/lib/cups/backend
++backendnet_bindir = /usr/libexec/cups/backend
+ backendnet_bin_PROGRAMS = cnijnet
+ transform = 
+ 
 diff --git a/backendnet/backend/cnijnetlm.c b/backendnet/backend/cnijnetlm.c
 index 8edb6b5..2c1dedf 100755
 --- a/backendnet/backend/cnijnetlm.c
@@ -1327,6 +1351,16 @@ index 11c5231..0d899a5 100755
  				keytext_name = DEFAULT_KEYTEXT_FILE;
  				unit_name    = DEFAULT_UNIT_MM;
  				last = TRUE;
+diff --git a/pstocanonij/filter/Makefile.am b/pstocanonij/filter/Makefile.am
+index 63ca410..a9a6099 100644
+--- a/pstocanonij/filter/Makefile.am
++++ b/pstocanonij/filter/Makefile.am
+@@ -1,4 +1,4 @@
+-filterdir=$(libdir)/cups/filter
++filterdir=$(libexecdir)/cups/filter
+ 
+ filter_PROGRAMS= pstocanonij
+ 
 diff --git a/pstocanonij/filter/pstocanonij.c b/pstocanonij/filter/pstocanonij.c
 index 1b1e48d..35f793a 100755
 --- a/pstocanonij/filter/pstocanonij.c

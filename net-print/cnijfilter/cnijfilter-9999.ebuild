@@ -54,7 +54,8 @@ src_configure() {
 	for d in ${SRC_DIRS[@]}; do
 		echo ">>> Working in: ${d}"
 		pushd ${d} >/dev/null
-		econf --program-suffix="${PRINTER_USE}"
+		econf --program-suffix="${PRINTER_USE}" \
+			  --enable-progpath="/usr/bin"
 		popd > /dev/null
 	done
 }
@@ -76,12 +77,15 @@ src_install() {
 		popd > /dev/null
 	done
 
-	local _libdir="${EPREFIX}/usr/lib64"
-	dodir ${_libdir}
+	local _libexecdir="/usr/libexec"
+	local _libdir="/usr/lib64"
+
+	dodir ${EPREFIX}${_libdir}
 	# no doexe due to symlinks
 	cp -a {${PRINTER_ID},com}/libs_bin64/* "${D}/${_libdir}" || die
+	dosym pstocanonij${PRINTER_USE} ${_libexecdir}/cups/filter/pstocanonij
 
-	exeinto ${_libdir}/cnijlib
+	exeinto ${EPREFIX}${_libdir}/cnijlib
 	doexe ${PRINTER_ID}/database/* com/ini/cnnet.ini
 	# create symlink for the cnijlib to bjlib as some formats need it
 	dosym ${_libdir}/cnijlib ${_libdir}/bjlib
